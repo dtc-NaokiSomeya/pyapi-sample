@@ -16,3 +16,9 @@ class InvalidContentType(BaseRestException):
         BaseRestException.__init__(self)
         self.status_code = 400
         self.message = "Invalid Content-Type"
+
+class UnauthorizedError(BaseRestException):
+    def __init__(self):
+        BaseRestException.__init__(self)
+        self.status_code = 401
+        self.message = "Unauthorized"

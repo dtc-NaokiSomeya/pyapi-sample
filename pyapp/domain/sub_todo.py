@@ -1,5 +1,6 @@
 import os
 import pg8000
+from typing import Dict
 
 # Prod
 DEFAULT_DBUSER="postgres"
@@ -16,7 +17,8 @@ DBPASS = os.getenv('DB_PASS', DEFAULT_DBPASS)
 
 # todos apis
 class Todo:
-    def create_todo(self, todo):
+    def create_todo(self, req: Dict) -> Dict:
+        todo = req["body"]
         conn = pg8000.connect(host=DBHOST, port=DBPORT, user=DBUSER, password=DBPASS, database=DBNAME)
         cur = conn.cursor()
         cur.execute(
@@ -26,7 +28,8 @@ class Todo:
         conn.close()
         return todo
 
-    def update_todo(self, todo):
+    def update_todo(self, req: Dict) -> Dict:
+        todo = req["body"]
         conn = pg8000.connect(host=DBHOST, port=DBPORT, user=DBUSER, password=DBPASS, database=DBNAME)
         cur = conn.cursor()
         cur.execute(
@@ -36,7 +39,7 @@ class Todo:
         conn.close()
         return todo
 
-    def list_todo(self, params):
+    def list_todo(self, req: Dict) -> Dict:
         conn = pg8000.connect(host=DBHOST, port=DBPORT, user=DBUSER, password=DBPASS, database=DBNAME)
         cur = conn.cursor()
         cur.execute(
@@ -52,3 +55,5 @@ class Todo:
         conn.close()
         return resp
 
+    def version(self, req: Dict) -> Dict:
+        return {"version": req}

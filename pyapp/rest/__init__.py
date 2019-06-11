@@ -1,25 +1,62 @@
 
-from typing import Callable
+from typing import Callable, Dict
 from os import listdir
 from os.path import isfile, join, dirname
 from importlib import import_module
 from pyapp import exceptions
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Request
 import inspect
+class RequestParser:
+    # Authorized user info header, which added by api gateway authorizer
+    COGNITO_EMAIL_HEADER = "X-Cognito-Email"
+    COGNITO_NAME_HEADER = "X-Cognito-Username"
+    COGNITO_OLD_USER_NAME_HEADER = "X-Cognito-Old-Username"
+
+    @classmethod
+    def parse(cls) -> Dict:
+        req_obj: Request = request
+        info = {}
+        try:
+            # Basic information
+            info["httpMethod"]                      = req_obj.method
+            info["multiValueHeaders"]               = {}
+            for k in req_obj.headers.keys():
+                info["multiValueHeaders"][k] = req_obj.headers.get_all(k)
+            info["multiValueQueryStringParameters"] = {}
+            for k in req_obj.args.keys():
+                info["multiValueQueryStringParameters"][k] = req_obj.args.getlist(k)
+            info["body"]                            = req_obj.get_json()
+            info["isBase64Encoded"]                 = False
+
+            # Auth information
+            if len(req_obj.headers.get_all(cls.COGNITO_NAME_HEADER)) != 1 or len(req_obj.headers.get_all(cls.COGNITO_EMAIL_HEADER)) != 1 or len(req_obj.headers.get_all(cls.COGNITO_OLD_USER_NAME_HEADER)) != 1:
+                # NOTICE: If authorized user info headers are multiply set, raise unauth error.
+                raise exceptions.UnauthorizedError()
+            info["cognito:username"]        = req_obj.headers[cls.COGNITO_NAME_HEADER]
+            info["email"]                   = req_obj.headers[cls.COGNITO_EMAIL_HEADER]
+            info["custom:old_user_name"]    = req_obj.headers[cls.COGNITO_OLD_USER_NAME_HEADER]
+            info["path"] = req_obj.path
+
+            info["sourceIp"]                = req_obj.remote_addr
+        except KeyError as e:
+            raise exceptions.UnauthorizedError()
+
+        return info
+
 class HttpMethods:
     def POST(func: Callable) -> Callable:
         def wrapper(**kwargs):
-            req_body = request.get_json()
-            if req_body is None:
+            req = RequestParser.parse()
+            if req["body"] is None or req["httpMethod"] != "POST":
                 raise exceptions.InvalidContentType()
-            return jsonify(func(req_body))
+            return jsonify(func(req))
         return wrapper
 
     def GET(func: Callable) -> Callable:
         def wrapper(**kwargs):
-            get_params = request.args
-            return jsonify(func(get_params))
+            req = RequestParser.parse()
+            return jsonify(func(req))
         return wrapper
 
 # Auto routing
